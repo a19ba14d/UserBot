@@ -164,10 +164,46 @@ sudo journalctl -u userbot.service -f
 
 unit 已配置 `Restart=on-failure`, 异常崩溃会自动拉起. 想停就 `sudo systemctl stop userbot`.
 
-### B. Docker
+### B. Docker Compose (推荐, 最简)
+
+项目已带 `docker-compose.yml`, 三条命令搞定:
+
+```bash
+# 第一次: 交互式登录, 输入手机号 + 验证码, 看到 "Listening for mentions..." 后 Ctrl-C
+docker compose run --rm userbot
+
+# 之后每天: 后台启动
+docker compose up -d
+
+# 看日志 (跟随)
+docker compose logs -f
+
+# 停止
+docker compose down
+```
+
+补充:
+
+- `docker compose up -d --build` — 改了代码后重建镜像并起
+- `docker compose stop` / `docker compose start` — 不删容器, 只停/起
+- `docker compose restart` — 重启 (例如改了 `.env` 后)
+- session 持久化在 `./sessions/userbot.session`, 容器重建不丢登录
+- `restart: unless-stopped` 已配置, 容器/宿主机重启后自动拉起
+- 日志限制 30MB (`max-size: 10m`, `max-file: 3`), 不会撑爆磁盘
+
+### C. 纯 Docker (不用 compose 时)
 
 ```bash
 docker build -t userbot .
+
+# 首次: 交互式登录
+docker run --rm -it \
+  --env-file .env \
+  -v $(pwd)/sessions:/app/sessions \
+  userbot
+# 看到 "Logged in as ..." 后 Ctrl-C
+
+# 后台运行
 docker run -d --name userbot \
   --env-file .env \
   -v $(pwd)/sessions:/app/sessions \
@@ -175,25 +211,10 @@ docker run -d --name userbot \
   userbot
 ```
 
-注意:
+`.session` 文件位于容器内 `/app/sessions/userbot.session` (Dockerfile 中
+`TG_SESSION_NAME=/app/sessions/userbot`); 必须挂载持久卷否则容器重建要重新登录.
 
-- `.session` 文件位于 `/app/sessions/userbot.session` (Dockerfile 里
-  `TG_SESSION_NAME=/app/sessions/userbot`). 必须挂载持久卷, 否则容器重建后
-  需要重新登录.
-- 首次运行需要交互式登录, 不能直接 `-d` 后台. 先这样登录:
-
-  ```bash
-  docker run --rm -it \
-    --env-file .env \
-    -v $(pwd)/sessions:/app/sessions \
-    userbot
-  # 输入手机号 + 验证码, 看到 "Logged in as ..." 后 Ctrl-C
-  ```
-
-  之后 `sessions/userbot.session` 已生成, 再用 `-d` 后台跑.
-- `--env-file .env` 直接读 .env, 不要把凭据写到 Dockerfile.
-
-### C. tmux / nohup (单机简易, 不推荐生产)
+### D. tmux / nohup (单机简易, 不推荐生产)
 
 ```bash
 nohup .venv/bin/python -m userbot > userbot.log 2>&1 &
@@ -323,6 +344,7 @@ DEBUG 级别会打印:
 UserBot/
 ├── README.md
 ├── Dockerfile
+├── docker-compose.yml         # docker compose 一键启停
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
