@@ -9,8 +9,11 @@ services:
     volumes:
       # session 文件 = 账号身份, 持久化到宿主机, 容器重建不会丢登录
       - ./sessions:/app/sessions
-    # 实时日志, 不缓冲 (Dockerfile 里也设了, 这里再保险一次)
+    # 这里的 environment 优先级高于 env_file, 用来强制覆盖容器内必须用挂载点路径的字段
     environment:
+      # session 文件必须落到挂载卷, 否则首次登录后容器一删就丢
+      - TG_SESSION_NAME=/app/sessions/userbot
+      # 实时日志, 不缓冲
       - PYTHONUNBUFFERED=1
     # 日志大小限制, 避免长期运行撑爆磁盘
     logging:
