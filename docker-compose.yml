@@ -1,0 +1,20 @@
+services:
+  userbot:
+    build: .
+    image: userbot:latest
+    container_name: userbot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # session 文件 = 账号身份, 持久化到宿主机, 容器重建不会丢登录
+      - ./sessions:/app/sessions
+    # 实时日志, 不缓冲 (Dockerfile 里也设了, 这里再保险一次)
+    environment:
+      - PYTHONUNBUFFERED=1
+    # 日志大小限制, 避免长期运行撑爆磁盘
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
