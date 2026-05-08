@@ -1,0 +1,46 @@
+# Telegram UserBot Feishu Reminder — systemd unit
+#
+# 安装步骤:
+#   1. 在 VPS 创建专用账户:    sudo useradd -r -m -d /opt/userbot userbot
+#   2. 把代码部署到 /opt/userbot, 创建 venv 并安装依赖:
+#        sudo -u userbot python3 -m venv /opt/userbot/.venv
+#        sudo -u userbot /opt/userbot/.venv/bin/pip install -r /opt/userbot/requirements.txt
+#   3. 拷贝 .env.example 为 .env 并填入凭据:
+#        sudo cp /opt/userbot/.env.example /opt/userbot/.env
+#        sudo chown userbot:userbot /opt/userbot/.env
+#        sudo chmod 600 /opt/userbot/.env
+#   4. 首次登录 (必须以 userbot 用户在前台跑一次, 输入手机号 + 验证码):
+#        sudo -u userbot /opt/userbot/.venv/bin/python -m userbot
+#      成功后 Ctrl-C 退出, 会生成 .session 文件 (账号身份, 不要泄漏).
+#   5. 安装并启用本 unit:
+#        sudo cp /opt/userbot/deploy/userbot.service /etc/systemd/system/
+#        sudo systemctl daemon-reload
+#        sudo systemctl enable --now userbot.service
+#   6. 查看日志:
+#        sudo journalctl -u userbot.service -f
+
+[Unit]
+Description=Telegram UserBot Feishu Reminder
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=userbot
+Group=userbot
+WorkingDirectory=/opt/userbot
+EnvironmentFile=/opt/userbot/.env
+ExecStart=/opt/userbot/.venv/bin/python -m userbot
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# 基础加固
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
