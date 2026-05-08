@@ -57,6 +57,13 @@ class Config:
     blacklist_chat_ids: FrozenSet[int] = field(default_factory=frozenset)
     log_level: str = "INFO"
 
+    # Bark iOS 推送 (https://bark.day.app); device_key 为空则禁用 Bark.
+    bark_device_key: str = ""
+    bark_server_url: str = "https://api.day.app"
+    bark_critical: bool = True
+    bark_call: bool = True
+    bark_sound: str = ""
+
     def is_chat_allowed(self, chat_id: int) -> bool:
         """判断给定 chat_id 是否应当被监听.
 
@@ -116,4 +123,11 @@ def load_config() -> Config:
         whitelist_chat_ids=_parse_id_set(os.getenv("WHITELIST_CHAT_IDS")),
         blacklist_chat_ids=_parse_id_set(os.getenv("BLACKLIST_CHAT_IDS")),
         log_level=(os.getenv("LOG_LEVEL", "").strip() or "INFO").upper(),
+        bark_device_key=os.getenv("BARK_DEVICE_KEY", "").strip(),
+        bark_server_url=(
+            os.getenv("BARK_SERVER_URL", "").strip() or "https://api.day.app"
+        ),
+        bark_critical=_parse_bool(os.getenv("BARK_CRITICAL"), True),
+        bark_call=_parse_bool(os.getenv("BARK_CALL"), True),
+        bark_sound=os.getenv("BARK_SOUND", "").strip(),
     )

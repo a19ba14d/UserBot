@@ -85,11 +85,46 @@ cp .env.example .env
 | `WHITELIST_CHAT_IDS` | 否 | 空 | 白名单 chat_id, 逗号分隔. 非空时仅监听这些 chat |
 | `BLACKLIST_CHAT_IDS` | 否 | 空 | 黑名单 chat_id, 逗号分隔. 命中则忽略 |
 | `LOG_LEVEL` | 否 | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` / `CRITICAL` (大小写不敏感) |
+| `BARK_DEVICE_KEY` | 否 | 空 | Bark iOS 推送 device key (https://bark.day.app), 留空则禁用 Bark, 仅飞书 |
+| `BARK_SERVER_URL` | 否 | `https://api.day.app` | Bark 服务器, 自建实例可改 |
+| `BARK_CRITICAL` | 否 | `true` | 用 `critical` 级别推送 (绕过静音/勿扰), 需 iOS 设置允许"重要警告" |
+| `BARK_CALL` | 否 | `true` | `call=1` 让铃声重复 30 秒, 像电话一样 |
+| `BARK_SOUND` | 否 | 空 | 自定义铃声名 (Bark 内置), 留空用默认 |
 
 获取 chat_id: 跑起来后留意日志中的 `chat_id=...`, 或临时把 `LOG_LEVEL=DEBUG`
 看每条消息的 chat_id.
 
 ---
+
+## Bark iOS 推送 (可选, 强烈推荐)
+
+光发飞书消息容易被忽略, Bark 可以让 iPhone **像来电一样持续响铃 30 秒**, 即使
+手机静音/勿扰也能被叫醒. 推荐和飞书一起用 (二者并发推送, 互不影响).
+
+启用步骤:
+
+1. iPhone App Store 搜 "Bark" → 安装并打开 App.
+2. App 首页能看到一段形如 `https://api.day.app/xxxxxxxxxxxx/` 的 URL,
+   把中间的 device key 填到 `.env` 的 `BARK_DEVICE_KEY=...`.
+3. **重要**: iOS 设置 → 通知 → Bark → 打开"重要警告 (Critical Alerts)".
+   不开这个 `critical` 级别就无法绕过静音模式.
+4. 重启 UserBot, 看到 `bark notifier enabled` 即生效.
+
+调节强度:
+
+- `BARK_CRITICAL=false` — 关闭 critical (普通推送, 不绕过静音)
+- `BARK_CALL=false` — 关闭持续响铃 (只响一声)
+- 两个都关 = 普通通知, 看心情用
+
+测试:
+
+```bash
+curl -X POST "https://api.day.app/<你的key>" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"测试","body":"hello","level":"critical","volume":10,"call":"1"}'
+```
+
+收到响铃 = 配置正确. 没响就检查 critical alerts 权限.
 
 ## 飞书机器人创建步骤
 
@@ -358,7 +393,9 @@ UserBot/
     ├── logging_setup.py       # 日志格式
     ├── telegram_listener.py   # Telethon 事件监听
     ├── reminder_manager.py    # 倒计时管理
-    └── feishu_notifier.py     # 飞书 webhook 推送
+    ├── feishu_notifier.py     # 飞书 webhook 推送
+    ├── bark_notifier.py       # Bark iOS 推送 (可选)
+    └── broadcast_notifier.py  # 多通道并发广播
 ```
 
 ---

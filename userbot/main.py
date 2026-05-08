@@ -17,6 +17,8 @@ import signal
 
 from telethon import TelegramClient
 
+from userbot.bark_notifier import BarkNotifier
+from userbot.broadcast_notifier import BroadcastNotifier
 from userbot.config import load_config
 from userbot.feishu_notifier import FeishuNotifier
 from userbot.logging_setup import setup_logging
@@ -42,7 +44,15 @@ async def run() -> None:
     )
 
     client = TelegramClient(config.session_name, config.api_id, config.api_hash)
-    notifier = FeishuNotifier(config)
+
+    # 注册所有 notifier; 通过 BroadcastNotifier 广播, 任意一个失败不影响其它
+    notifiers: list = [FeishuNotifier(config)]
+    if config.bark_device_key:
+        notifiers.append(BarkNotifier(config))
+        logger.info("bark notifier enabled (server=%s)", config.bark_server_url)
+    else:
+        logger.info("bark notifier disabled (BARK_DEVICE_KEY empty)")
+    notifier = BroadcastNotifier(notifiers)
     manager = ReminderManager(config, notifier)
     listener = TelegramListener(
         client=client,
