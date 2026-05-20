@@ -84,6 +84,8 @@ cp .env.example .env
 | `INCLUDE_MESSAGE_TEXT` | 否 | `true` | **隐私敏感**. `false` 时飞书 payload 不含消息原文, 只发送 `chat_title + sender + 时间 + 跳转链接` |
 | `WHITELIST_CHAT_IDS` | 否 | 空 | 白名单 chat_id, 逗号分隔. 非空时仅监听这些 chat |
 | `BLACKLIST_CHAT_IDS` | 否 | 空 | 黑名单 chat_id, 逗号分隔. 命中则忽略 |
+| `WHITELIST_BOT_IDS` | 否 | 空 | 私聊 bot 白名单 user_id, 逗号分隔. 默认忽略所有私聊 bot |
+| `WHITELIST_BOT_USERNAMES` | 否 | 空 | 私聊 bot 白名单 username, 逗号分隔, 支持带或不带 `@`; 与 `WHITELIST_BOT_IDS` 任一命中即可 |
 | `LOG_LEVEL` | 否 | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` / `CRITICAL` (大小写不敏感) |
 | `BARK_DEVICE_KEY` | 否 | 空 | Bark iOS 推送 device key (https://bark.day.app), 留空则禁用 Bark, 仅飞书 |
 | `BARK_SERVER_URL` | 否 | `https://api.day.app` | Bark 服务器, 自建实例可改 |
@@ -93,6 +95,10 @@ cp .env.example .env
 
 获取 chat_id: 跑起来后留意日志中的 `chat_id=...`, 或临时把 `LOG_LEVEL=DEBUG`
 看每条消息的 chat_id.
+
+私聊机器人过滤: 普通用户私聊不受影响; 私聊 bot 默认不触发提醒. 如果确实需要
+某个 bot 的私聊触发提醒, 把它的 user_id 加入 `WHITELIST_BOT_IDS`, 或把 username
+加入 `WHITELIST_BOT_USERNAMES`. 这个规则只影响私聊 bot, 不影响群聊里 bot @ 你.
 
 ---
 

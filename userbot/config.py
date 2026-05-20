@@ -26,7 +26,7 @@ def _parse_int(raw: str | None, default: int, name: str) -> int:
         raise ValueError(f"{name} 必须是整数, 当前值: {raw!r}") from exc
 
 
-def _parse_id_set(raw: str | None) -> FrozenSet[int]:
+def _parse_id_set(raw: str | None, name: str) -> FrozenSet[int]:
     if not raw or not raw.strip():
         return frozenset()
     out: list[int] = []
@@ -37,7 +37,24 @@ def _parse_id_set(raw: str | None) -> FrozenSet[int]:
         try:
             out.append(int(part))
         except ValueError as exc:
-            raise ValueError(f"chat_id 列表中包含非整数: {part!r}") from exc
+            raise ValueError(f"{name} 列表中包含非整数: {part!r}") from exc
+    return frozenset(out)
+
+
+def _normalize_bot_username(raw: str | None) -> str:
+    if not raw:
+        return ""
+    return raw.strip().lstrip("@").lower()
+
+
+def _parse_bot_username_set(raw: str | None) -> FrozenSet[str]:
+    if not raw or not raw.strip():
+        return frozenset()
+    out: list[str] = []
+    for part in raw.split(","):
+        username = _normalize_bot_username(part)
+        if username:
+            out.append(username)
     return frozenset(out)
 
 
@@ -55,6 +72,8 @@ class Config:
     include_message_text: bool = True
     whitelist_chat_ids: FrozenSet[int] = field(default_factory=frozenset)
     blacklist_chat_ids: FrozenSet[int] = field(default_factory=frozenset)
+    whitelist_bot_ids: FrozenSet[int] = field(default_factory=frozenset)
+    whitelist_bot_usernames: FrozenSet[str] = field(default_factory=frozenset)
     log_level: str = "INFO"
 
     # Bark iOS 推送 (https://bark.day.app); device_key 为空则禁用 Bark.
@@ -77,6 +96,21 @@ class Config:
         if self.whitelist_chat_ids and chat_id not in self.whitelist_chat_ids:
             return False
         return True
+
+    def is_private_bot_allowed(self, bot_id: int, username: str | None) -> bool:
+        """判断私聊 bot 发送者是否允许触发提醒.
+
+        私聊 bot 默认拒绝; ID 或 username 任一命中白名单时允许.
+        """
+        if bot_id in self.whitelist_bot_ids:
+            return True
+        normalized_username = _normalize_bot_username(username)
+        if (
+            normalized_username
+            and normalized_username in self.whitelist_bot_usernames
+        ):
+            return True
+        return False
 
 
 def load_config() -> Config:
@@ -120,8 +154,21 @@ def load_config() -> Config:
         ),
         enable_private_chat=_parse_bool(os.getenv("ENABLE_PRIVATE_CHAT"), True),
         include_message_text=_parse_bool(os.getenv("INCLUDE_MESSAGE_TEXT"), True),
-        whitelist_chat_ids=_parse_id_set(os.getenv("WHITELIST_CHAT_IDS")),
-        blacklist_chat_ids=_parse_id_set(os.getenv("BLACKLIST_CHAT_IDS")),
+        whitelist_chat_ids=_parse_id_set(
+            os.getenv("WHITELIST_CHAT_IDS"),
+            "WHITELIST_CHAT_IDS",
+        ),
+        blacklist_chat_ids=_parse_id_set(
+            os.getenv("BLACKLIST_CHAT_IDS"),
+            "BLACKLIST_CHAT_IDS",
+        ),
+        whitelist_bot_ids=_parse_id_set(
+            os.getenv("WHITELIST_BOT_IDS"),
+            "WHITELIST_BOT_IDS",
+        ),
+        whitelist_bot_usernames=_parse_bot_username_set(
+            os.getenv("WHITELIST_BOT_USERNAMES"),
+        ),
         log_level=(os.getenv("LOG_LEVEL", "").strip() or "INFO").upper(),
         bark_device_key=os.getenv("BARK_DEVICE_KEY", "").strip(),
         bark_server_url=(

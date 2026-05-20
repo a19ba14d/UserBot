@@ -65,10 +65,13 @@ class TelegramListener:
             logger.exception("get_me() 失败, 继续监听 (可能影响日志显示)")
         logger.info(
             "Listening for mentions and private messages "
-            "(enable_private_chat=%s, whitelist=%d, blacklist=%d)",
+            "(enable_private_chat=%s, whitelist=%d, blacklist=%d, "
+            "bot_id_whitelist=%d, bot_username_whitelist=%d)",
             self.config.enable_private_chat,
             len(self.config.whitelist_chat_ids),
             len(self.config.blacklist_chat_ids),
+            len(self.config.whitelist_bot_ids),
+            len(self.config.whitelist_bot_usernames),
         )
         await self.client.run_until_disconnected()
 
@@ -141,6 +144,17 @@ class TelegramListener:
 
         sender = await event.get_sender()
         sender_id = getattr(sender, "id", 0) if sender else 0
+
+        if event.is_private and getattr(sender, "bot", False):
+            username = getattr(sender, "username", None)
+            if not self.config.is_private_bot_allowed(sender_id, username):
+                logger.debug(
+                    "私聊 bot 白名单过滤: sender_id=%s username=%s",
+                    sender_id,
+                    username,
+                )
+                return
+
         sender_name = self._build_sender_name(sender, sender_id)
 
         if event.is_private:

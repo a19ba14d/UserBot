@@ -35,12 +35,15 @@ async def run() -> None:
     logger = logging.getLogger("userbot.main")
     logger.info("starting userbot...")
     logger.info(
-        "config: reminder=%ss private=%s include_text=%s whitelist=%d blacklist=%d",
+        "config: reminder=%ss private=%s include_text=%s whitelist=%d "
+        "blacklist=%d bot_id_whitelist=%d bot_username_whitelist=%d",
         config.reminder_seconds,
         config.enable_private_chat,
         config.include_message_text,
         len(config.whitelist_chat_ids),
         len(config.blacklist_chat_ids),
+        len(config.whitelist_bot_ids),
+        len(config.whitelist_bot_usernames),
     )
 
     client = TelegramClient(config.session_name, config.api_id, config.api_hash)

@@ -56,6 +56,8 @@ class TelegramListener:
              → 调用 on_trigger(PendingReminder)
           2. 配置 enable_private_chat=True 时, 私聊里收到他人消息
              → 调用 on_trigger(PendingReminder)
+             其中私聊 bot 默认忽略, 仅 whitelist_bot_ids /
+             whitelist_bot_usernames 命中时允许触发.
           3. 我自己 (out=True) 在某个 chat 发了消息
              → 调用 on_self_reply(chat_id), 用于取消该 chat 的待发提醒
 
