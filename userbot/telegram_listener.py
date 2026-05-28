@@ -43,11 +43,13 @@ class TelegramListener:
         config: Config,
         on_trigger: Callable[[PendingReminder], Awaitable[None]],
         on_self_reply: Callable[[int], Awaitable[None]],
+        on_outgoing_message: Callable[[int, str], Awaitable[None]] | None = None,
     ) -> None:
         self.client = client
         self.config = config
         self.on_trigger = on_trigger
         self.on_self_reply = on_self_reply
+        self.on_outgoing_message = on_outgoing_message
         self._handlers_registered = False
 
     # ------------------------------------------------------------------
@@ -210,6 +212,13 @@ class TelegramListener:
         if not self.config.is_chat_allowed(event.chat_id):
             logger.debug("outgoing 白/黑名单过滤: chat_id=%s", event.chat_id)
             return
+
+        if self.on_outgoing_message is not None:
+            text = event.message.message or ""
+            try:
+                await self.on_outgoing_message(event.chat_id, text)
+            except Exception:
+                logger.exception("on_outgoing_message 回调抛异常 (已吞掉)")
 
         logger.info("自回复: chat_id=%s msg_id=%s", event.chat_id, event.message.id)
         try:

@@ -53,7 +53,7 @@ class BarkNotifier:
             body_lines.append(text)
 
         body = {
-            "title": "TG 未回复提醒",
+            "title": payload.get("title", "TG 未回复提醒"),
             "body": "\n".join(body_lines),
             "url": payload["message_link"],
             "group": "TG-Reminder",

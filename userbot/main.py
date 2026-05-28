@@ -19,6 +19,7 @@ from telethon import TelegramClient
 
 from userbot.bark_notifier import BarkNotifier
 from userbot.broadcast_notifier import BroadcastNotifier
+from userbot.checkin_manager import CheckInManager
 from userbot.config import load_config
 from userbot.feishu_notifier import FeishuNotifier
 from userbot.logging_setup import setup_logging
@@ -26,6 +27,23 @@ from userbot.reminder_manager import ReminderManager
 from userbot.telegram_listener import TelegramListener
 
 __all__ = ["run", "main"]
+
+
+def _build_notifiers(config) -> list:
+    logger = logging.getLogger("userbot.main")
+    notifiers: list = []
+    if config.feishu_enabled:
+        notifiers.append(FeishuNotifier(config))
+        logger.info("feishu notifier enabled")
+    else:
+        logger.info("feishu notifier disabled (FEISHU_ENABLED=false)")
+
+    if config.bark_device_key:
+        notifiers.append(BarkNotifier(config))
+        logger.info("bark notifier enabled (server=%s)", config.bark_server_url)
+    else:
+        logger.info("bark notifier disabled (BARK_DEVICE_KEY empty)")
+    return notifiers
 
 
 async def run() -> None:
@@ -36,7 +54,8 @@ async def run() -> None:
     logger.info("starting userbot...")
     logger.info(
         "config: reminder=%ss private=%s include_text=%s whitelist=%d "
-        "blacklist=%d bot_id_whitelist=%d bot_username_whitelist=%d",
+        "blacklist=%d bot_id_whitelist=%d bot_username_whitelist=%d "
+        "checkin_enabled=%s feishu_enabled=%s",
         config.reminder_seconds,
         config.enable_private_chat,
         config.include_message_text,
@@ -44,24 +63,22 @@ async def run() -> None:
         len(config.blacklist_chat_ids),
         len(config.whitelist_bot_ids),
         len(config.whitelist_bot_usernames),
+        config.checkin_enabled,
+        config.feishu_enabled,
     )
 
     client = TelegramClient(config.session_name, config.api_id, config.api_hash)
 
     # 注册所有 notifier; 通过 BroadcastNotifier 广播, 任意一个失败不影响其它
-    notifiers: list = [FeishuNotifier(config)]
-    if config.bark_device_key:
-        notifiers.append(BarkNotifier(config))
-        logger.info("bark notifier enabled (server=%s)", config.bark_server_url)
-    else:
-        logger.info("bark notifier disabled (BARK_DEVICE_KEY empty)")
-    notifier = BroadcastNotifier(notifiers)
+    notifier = BroadcastNotifier(_build_notifiers(config))
+    checkin_manager = CheckInManager(client=client, config=config, notifier=notifier)
     manager = ReminderManager(config, notifier)
     listener = TelegramListener(
         client=client,
         config=config,
         on_trigger=manager.schedule,
         on_self_reply=manager.cancel,
+        on_outgoing_message=checkin_manager.handle_outgoing_message,
     )
 
     stop_event = asyncio.Event()
@@ -78,6 +95,7 @@ async def run() -> None:
             # Windows 不支持 add_signal_handler
             pass
 
+    await checkin_manager.start()
     listener_task = asyncio.create_task(listener.run(), name="listener")
     stop_task = asyncio.create_task(stop_event.wait(), name="stop")
 
@@ -101,6 +119,10 @@ async def run() -> None:
             listener_exc = listener_task.exception()
     finally:
         logger.info("shutting down...")
+        try:
+            await checkin_manager.stop()
+        except Exception:
+            logger.exception("error during checkin_manager.stop()")
         try:
             await manager.stop_all()
         except Exception:

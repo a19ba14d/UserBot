@@ -77,8 +77,9 @@ cp .env.example .env
 | `TG_API_ID` | 是 | - | Telegram API ID, 在 https://my.telegram.org → API development tools 申请 |
 | `TG_API_HASH` | 是 | - | Telegram API Hash, 同上 |
 | `TG_SESSION_NAME` | 否 | `userbot` | Telethon session 文件名 (不带 `.session` 后缀); 也可填绝对路径如 `/app/sessions/userbot` 用于持久化 |
-| `FEISHU_WEBHOOK_URL` | 是 | - | 飞书自定义机器人 webhook URL, 形如 `https://open.feishu.cn/open-apis/bot/v2/hook/xxxx` |
-| `FEISHU_SECRET` | 否 | 空 | 飞书机器人启用签名校验时的密钥; 不启用留空 |
+| `FEISHU_ENABLED` | 否 | `true` | 是否启用飞书/Lark bot 推送. `false` 时不会注册 Feishu notifier, `FEISHU_WEBHOOK_URL` 可留空 |
+| `FEISHU_WEBHOOK_URL` | `FEISHU_ENABLED=true` 时是 | - | 飞书/Lark 自定义机器人 webhook URL, 形如 `https://open.feishu.cn/open-apis/bot/v2/hook/xxxx` |
+| `FEISHU_SECRET` | 否 | 空 | 飞书/Lark 机器人启用签名校验时的密钥; 不启用留空 |
 | `REMINDER_SECONDS` | 否 | `300` | 倒计时秒数; 收到触发后多少秒未回复则发提醒 |
 | `ENABLE_PRIVATE_CHAT` | 否 | `true` | 是否启用私聊触发. `false` 时仅监听群聊 @ |
 | `INCLUDE_MESSAGE_TEXT` | 否 | `true` | **隐私敏感**. `false` 时飞书 payload 不含消息原文, 只发送 `chat_title + sender + 时间 + 跳转链接` |
@@ -92,6 +93,20 @@ cp .env.example .env
 | `BARK_CRITICAL` | 否 | `true` | 用 `critical` 级别推送 (绕过静音/勿扰), 需 iOS 设置允许"重要警告" |
 | `BARK_CALL` | 否 | `true` | `call=1` 让铃声重复 30 秒, 像电话一样 |
 | `BARK_SOUND` | 否 | 空 | 自定义铃声名 (Bark 内置), 留空用默认 |
+| `CHECKIN_ENABLED` | 否 | `false` | 上班打卡确认助手开关. 只提醒 + 本人确认后点击, 不支持无人值守自动打卡 |
+| `CHECKIN_TIMEZONE` | 否 | `Asia/Shanghai` | 打卡调度使用的时区 |
+| `CHECKIN_RANDOM_START` | 否 | `11:00` | 每日随机提醒窗口开始时间 |
+| `CHECKIN_RANDOM_END` | 否 | `11:30` | 每日随机提醒窗口结束时间 |
+| `CHECKIN_CHAT_TITLE` | 否 | `墨链公司-常规打卡群` | 目标 Telegram 群名 |
+| `CHECKIN_BOT_USERNAME` | 否 | `Web3CheckInAndOutbot` | 目标打卡机器人 username, 支持带或不带 `@` |
+| `CHECKIN_BUTTON_TEXT` | 否 | `上班打卡` | 要点击的 inline 按钮文本片段 |
+| `CHECKIN_FALLBACK_MESSAGE_ID` | 否 | `0` | 动态查找按钮失败时使用的 fallback 消息 ID; `0` 表示禁用 |
+| `CHECKIN_CONFIRM_REQUIRED` | 否 | `true` | 必须保持 `true`; 设置为 `false` 会启动失败 |
+| `CHECKIN_CONFIRM_COMMAND` | 否 | `/confirm_checkin` | 你本人在目标群发送此命令后才会点击按钮 |
+| `CHECKIN_SUCCESS_KEYWORDS` | 否 | `打卡成功,上班打卡成功,成功` | 机器人回复中任一关键词命中才算完成 |
+| `CHECKIN_RESULT_TIMEOUT_SECONDS` | 否 | `60` | 点击后等待成功回复的超时时间 |
+| `CHECKIN_STATE_FILE` | 否 | `sessions/checkin_state.json` | 每日状态文件, Docker 下应放在 session 持久化目录 |
+| `CHECKIN_SEARCH_LIMIT` | 否 | `800` | 动态查找最近多少条群消息中的按钮 |
 
 获取 chat_id: 跑起来后留意日志中的 `chat_id=...`, 或临时把 `LOG_LEVEL=DEBUG`
 看每条消息的 chat_id.
@@ -99,6 +114,18 @@ cp .env.example .env
 私聊机器人过滤: 普通用户私聊不受影响; 私聊 bot 默认不触发提醒. 如果确实需要
 某个 bot 的私聊触发提醒, 把它的 user_id 加入 `WHITELIST_BOT_IDS`, 或把 username
 加入 `WHITELIST_BOT_USERNAMES`. 这个规则只影响私聊 bot, 不影响群聊里 bot @ 你.
+
+关闭飞书/Lark bot 推送: 设置 `FEISHU_ENABLED=false` 后, 程序不会发送飞书/Lark
+webhook, 且 `FEISHU_WEBHOOK_URL` 可以留空. 如仍需要手机提醒, 配置 Bark; 如 Bark
+也为空, 到期提醒会被记录为无 notifier 可发送.
+
+上班打卡确认助手: 启用 `CHECKIN_ENABLED=true` 后, 程序每天会在
+`CHECKIN_RANDOM_START` 到 `CHECKIN_RANDOM_END` 之间随机发出一次提醒. 收到提醒后,
+你必须在 `CHECKIN_CHAT_TITLE` 对应群里发送 `CHECKIN_CONFIRM_COMMAND`; 程序才会查找
+`CHECKIN_BOT_USERNAME` 最近发出的 inline keyboard, 点击包含 `CHECKIN_BUTTON_TEXT` 的按钮,
+然后等待机器人回复命中 `CHECKIN_SUCCESS_KEYWORDS`. 只有收到成功回复才会通知"完成".
+未发送确认命令时不会点击任何按钮. 如果程序首次启动时当天随机窗口已经结束,
+当天不会补发提醒, 会等下一天的随机窗口.
 
 ---
 
@@ -172,7 +199,41 @@ Please enter your password (二步验证密码, 没设就直接回车): ********
 二次启动不再需要登录, 直接读取 session 文件.
 
 看到日志 `Logged in as <你的名字>` 和 `Listening for mentions and private messages`
-就是成功. 此时让朋友在群里 @ 你 (或私聊你), 不要回复, 等 5 分钟应该收到飞书提醒.
+就是成功. 此时让朋友在群里 @ 你 (或私聊你), 不要回复, 等 5 分钟应该收到已启用通知通道的提醒.
+
+---
+
+## 线上服务器信息
+
+以后提到本项目相关服务器或线上操作, 默认参考这里.
+
+SSH Host 配置:
+
+```sshconfig
+Host wallet-test
+  HostName 43.198.24.199
+  User root
+  IdentityFile /Users/song/.ssh/id_ed97
+```
+
+连接命令:
+
+```bash
+ssh wallet-test
+```
+
+当前线上目录为 `/root/UserBot`; 运行方式为 Docker Compose, 容器名 `userbot`.
+
+常用线上操作:
+
+```bash
+ssh wallet-test
+cd /root/UserBot
+docker compose ps userbot
+docker compose logs -f userbot
+docker compose up -d --build userbot
+docker compose restart userbot
+```
 
 ---
 
@@ -401,6 +462,7 @@ UserBot/
     ├── reminder_manager.py    # 倒计时管理
     ├── feishu_notifier.py     # 飞书 webhook 推送
     ├── bark_notifier.py       # Bark iOS 推送 (可选)
+    ├── checkin_manager.py     # 打卡提醒 + 本人确认后点击 + 成功校验
     └── broadcast_notifier.py  # 多通道并发广播
 ```
 

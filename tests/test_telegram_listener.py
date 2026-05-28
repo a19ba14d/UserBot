@@ -185,5 +185,50 @@ class TelegramListenerPrivateBotFilteringTests(unittest.IsolatedAsyncioTestCase)
         self.assertEqual(reminders[0].chat_title, "Ops Group")
 
 
+class TelegramListenerOutgoingCallbackTests(unittest.IsolatedAsyncioTestCase):
+    async def test_outgoing_message_callback_runs_before_self_reply_cancel(
+        self,
+    ) -> None:
+        calls = []
+
+        async def on_trigger(reminder) -> None:  # noqa: ANN001
+            raise AssertionError(f"unexpected trigger: {reminder}")
+
+        async def on_self_reply(chat_id: int) -> None:
+            calls.append(("self_reply", chat_id))
+
+        async def on_outgoing_message(chat_id: int, text: str) -> None:
+            calls.append(("outgoing", chat_id, text))
+
+        listener = TelegramListener(
+            client=object(),
+            config=Config(
+                api_id=1,
+                api_hash="hash",
+                feishu_webhook_url="https://example.invalid/webhook",
+            ),
+            on_trigger=on_trigger,
+            on_self_reply=on_self_reply,
+            on_outgoing_message=on_outgoing_message,
+        )
+        event = FakeEvent(
+            chat_id=-100123,
+            is_private=False,
+            mentioned=False,
+            sender=FakeSender(100, "me", bot=False),
+        )
+        event.message.message = "/confirm_checkin"
+
+        await listener._on_outgoing(event)
+
+        self.assertEqual(
+            calls,
+            [
+                ("outgoing", -100123, "/confirm_checkin"),
+                ("self_reply", -100123),
+            ],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

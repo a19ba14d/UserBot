@@ -72,7 +72,7 @@ class FeishuNotifier:
             "content": {
                 "post": {
                     "zh_cn": {
-                        "title": "Telegram 未回复提醒",
+                        "title": payload.get("title", "Telegram 未回复提醒"),
                         "content": content_lines,
                     },
                 },
